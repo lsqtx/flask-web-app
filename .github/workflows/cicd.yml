@@ -1,23 +1,28 @@
 name: Deploy Flask App to Touge Server
+
 on:
   push:
     branches:
       - main
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: requirements.txt
+
       - name: Install dependencies and run tests
         run: |
           python -m pip install --upgrade pip
@@ -25,6 +30,7 @@ jobs:
           pip install pytest==8.4.1
           pytest tests/ -v
         continue-on-error: false
+
       - name: Deploy to Touge Server via SSH (Port 52856)
         run: |
           # 配置SSH环境（强制兼容RSA私钥）
@@ -36,11 +42,12 @@ jobs:
           # 强制设置权限（SSH协议要求）
           chmod 600 ~/.ssh/id_rsa
           
-          # 扫描主机密钥（指定端口）
-          ssh-keyscan -p 52826 -H ${{ secrets.TOUGE_SERVER_IP }} >> ~/.ssh/known_hosts
+          # 扫描主机密钥（指定端口，去掉-H，加2>/dev/null屏蔽警告）
+          ssh-keyscan -p 52856 ${{ secrets.TOUGE_SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH环境配置完成，尝试连接服务器..."
-          # 连接服务器执行部署（添加-o选项兼容旧版SSH）
-          ssh -v -p 52826 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa root@${{ secrets.TOUGE_SERVER_IP }} << 'EOF'
+          
+          # 连接服务器执行部署（加入 StrictHostKeyChecking=no 避免卡死）
+          ssh -v -p 52856 -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa root@${{ secrets.TOUGE_SERVER_IP }} << 'EOF'
             set -e
             echo "成功连接服务器：$(whoami)@$(hostname)"
             
